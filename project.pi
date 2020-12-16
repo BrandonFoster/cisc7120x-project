@@ -1,0 +1,158 @@
+% CISC 7120X Programming Languages and Compilers Project
+% Programmer: Brandon Foster
+% Date: 12/16/2020
+% Note: This does not parse multiple lines, only a single line of input, and it does not parse spaces.
+% Usage:
+%   Picat> cl('project.pi').
+%   Picat> main.
+%   Input: x=1;y=2;z=---(x+y)*(x+-y);
+%   Output:
+%   x = 1
+%   y = 2
+%   z = 3
+
+
+main() =>
+    while (true)
+        IDMap = new_map(0),
+        print("Input: "),
+        Line = read_line(),
+        (parse_line(Line, IDMap) || println("error")),
+        clear(IDMap)
+    end.
+    
+parse_line(Line, IDMap) =>
+    program(Line, [], IDMap),
+    foreach (Id in keys(IDMap))
+        print(Id), print(" = "), println(get(IDMap, Id))
+    end.
+
+%% program -> assignment program | e
+% program -> assignment program
+program([Token|Si], So, IDMap) =>
+    assignment([Token|Si], S1, IDMap),
+    program(S1, So, IDMap).
+
+% program -> e
+program(Si, [], _) =>
+    Si = [].
+
+%% assignment -> identifier = exp;
+assignment(Si, So, IDMap) =>
+    identifier(Si, ['='|S1], Io),
+    exp(S1, [';'|So], Eo, IDMap),
+    put(IDMap, Io, Eo).
+    
+
+%% exp -> term exp'
+exp(Si, So, Eo, IDMap) =>
+    term(Si, S1, Ei, IDMap),
+    exp_prime(S1, So, Ei, Eo, IDMap).
+
+%% exp' -> + term exp' | - term exp' | e
+% exp' -> + term exp'
+exp_prime(['+'|Si], So, Ei, Eo, IDMap) =>
+    term(Si, S1, E1, IDMap),
+    E2 = Ei + E1,
+    exp_prime(S1, So, E2, Eo, IDMap).
+
+% exp' -> - term exp'
+exp_prime(['-'|Si], So, Ei, Eo, IDMap) =>
+    term(Si, S1, E1, IDMap),
+    E2 = Ei - E1,
+    exp_prime(S1, So, E2, Eo, IDMap).
+
+% exp' -> e
+exp_prime(Si, So, Ei, Eo, _) =>
+    Eo = Ei,
+    Si = So.
+
+%% term -> fact term'
+term(Si, So, To, IDMap) =>
+    fact(Si, S1, Ti, IDMap),
+    term_prime(S1, So, Ti, To, IDMap).
+
+%% term' -> * fact term' | e
+% term' -> * fact term'
+term_prime(['*'|Si], So, Ti, To, IDMap) =>
+    fact(Si, S1, T1, IDMap),
+    term_prime(S1, So, T1, T2, IDMap),
+    To = Ti * T2.
+
+% term' -> e
+term_prime(Si, So, Ti, To, _) =>
+    Ti = To,
+    Si = So.
+
+%% fact -> ( exp ) | + fact | - fact | literal | identifier
+% fact -> ( exp )
+fact(['('|Si], So, Fo, IDMap) =>
+    exp(Si, [')'|So], Fo, IDMap).
+
+% fact -> + fact
+fact(['+'|Si], So, Fo, IDMap) =>
+    fact(Si, So, Fo, IDMap).
+
+% fact -> - fact
+fact(['-'|Si], So, Fo, IDMap) =>
+    fact(Si, So, F1, IDMap),
+    Fo = -F1.
+
+% fact -> literal
+fact([Token|Si], So, Fo, _), ascii_digit(Token) =>
+    literal([Token|Si], So, Fs),
+    Fo = to_integer(Fs).
+
+% fact -> identifier, w.i.p.
+fact(Si, So, Fo, IDMap) =>
+    identifier(Si, So, Io),
+    has_key(IDMap, Io),
+    Fo = get(IDMap, Io).
+
+%% literal -> 0 | non_zero_digit optional_digits
+% literal -> 0
+literal(['0'|Si], So, Lo) =>
+    Lo = ['0'],
+    Si = So.
+
+% literal -> non_zero_digit optional_digits
+literal([Token|Si], So, Lo), ascii_nonzero_digit(Token) =>
+    Lo = [Token|L1],
+    optional_digits(Si, So, L1).
+
+%% identifier -> letter optional_alnums
+identifier([Token|Si], So, Io), ascii_alpha(Token) =>
+    Io = [Token|I1],
+    optional_alnums(Si, So, I1).
+identifier(['_'|Si], So, Io) =>
+    Io = ['_'|I1],
+    optional_alnums(Si, So, I1).
+
+% extra helper predicates
+optional_alnums([Token|Si], So, Io), ascii_alpha(Token) =>
+    Io = [Token|I1],
+    optional_alnums(Si, So, I1).
+optional_alnums([Token|Si], So, Io), ascii_digit(Token) =>
+    Io = [Token|I1],
+    optional_alnums(Si, So, I1).
+optional_alnums(['_'|Si], So, Io) =>
+    Io = ['_'|I1],
+    optional_alnums(Si, So, I1).
+optional_alnums(Si, So, Io) =>
+    Io = [], Si = So.
+
+optional_digits([Token|Si], So, Io), ascii_digit(Token) =>
+    Io = [Token|I1],
+    optional_digits(Si, So, I1).
+optional_digits(Si, So, Io) =>
+    Io = [], Si = So.
+
+ascii_nonzero_digit('1').
+ascii_nonzero_digit('2').
+ascii_nonzero_digit('3').
+ascii_nonzero_digit('4').
+ascii_nonzero_digit('5').
+ascii_nonzero_digit('6').
+ascii_nonzero_digit('7').
+ascii_nonzero_digit('8').
+ascii_nonzero_digit('9').
